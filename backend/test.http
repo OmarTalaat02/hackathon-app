@@ -1,0 +1,19 @@
+### Test 1: Get All Mosques
+GET http://localhost:8080/api/v1/mosques
+Accept: application/json
+
+### Test 2: Get Global Announcements Feed
+GET http://localhost:8080/api/v1/announcements/feed
+Accept: application/json
+
+### Test 3: Get All Upcoming Events
+GET http://localhost:8080/api/v1/events/upcoming
+Accept: application/json
+
+### Test 1: Get Daily Prayer Times for Leonia, NJ (Example Coordinates)
+GET http://localhost:8080/api/v1/prayer-times/daily?date=28-06-2025&latitude=40.8528&longitude=-74.0051&method=2
+Accept: application/json
+
+### Test 2: Get Monthly Prayer Times for Leonia, NJ
+GET http://localhost:8080/api/v1/prayer-times/monthly?year=2025&month=6&latitude=40.8528&longitude=-74.0051&method=2
+Accept: application/json

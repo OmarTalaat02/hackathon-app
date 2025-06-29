@@ -52,10 +52,6 @@ public class Event {
     @Column(nullable = false)
     private EventStatus status;
 
-    @ManyToOne(fetch = FetchType.LAZY) // Many events created by one user
-    @JoinColumn(name = "created_by_user_id", nullable = false)
-    private User createdByUser;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

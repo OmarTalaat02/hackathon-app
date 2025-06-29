@@ -39,10 +39,6 @@ public class Announcement {
     @Column(name = "is_published", nullable = false)
     private boolean isPublished;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_user_id", nullable = false)
-    private User createdByUser;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
