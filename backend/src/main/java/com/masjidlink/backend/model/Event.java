@@ -1,5 +1,6 @@
 package com.masjidlink.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,8 +23,9 @@ public class Event {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY) // Many events to one mosque
+    @ManyToOne(fetch = FetchType.EAGER) // Many events to one mosque
     @JoinColumn(name = "mosque_id", nullable = false) // Foreign key column
+    @JsonIgnore
     private Mosque mosque;
 
     @Column(nullable = false)

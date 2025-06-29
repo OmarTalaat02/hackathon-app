@@ -4,6 +4,8 @@ import com.masjidlink.backend.model.Announcement;
 import com.masjidlink.backend.model.Mosque;
 import com.masjidlink.backend.repository.AnnouncementRepository;
 import com.masjidlink.backend.repository.MosqueRepository;
+import com.masjidlink.backend.dto.AnnouncementResponse;
+import com.masjidlink.backend.dto.AnnouncementRequest; // Import the new DTO
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/announcements")
@@ -25,27 +28,47 @@ public class AnnouncementController {
         this.mosqueRepository = mosqueRepository;
     }
 
-    // GET all active announcements for the global feed
-    @GetMapping("/feed")
-    public ResponseEntity<List<Announcement>> getGlobalAnnouncementsFeed() {
-        List<Announcement> announcements = announcementRepository.findByIsPublishedTrueAndPublishDateLessThanEqualAndExpirationDateGreaterThanEqualOrExpirationDateIsNullOrderByPublishDateDesc(
-                LocalDateTime.now(), LocalDateTime.now()
+    private AnnouncementResponse convertToDto(Announcement announcement) {
+        Mosque mosque = announcement.getMosque();
+        return new AnnouncementResponse(
+                announcement.getId(),
+                announcement.getTitle(),
+                announcement.getContent(),
+                announcement.getPublishDate(),
+                announcement.getExpirationDate(),
+                announcement.isPublished(),
+                announcement.getCreatedAt(),
+                announcement.getUpdatedAt(),
+                mosque.getId(),
+                mosque.getName(),
+                mosque.getLogoUrl()
         );
-        return ResponseEntity.ok(announcements);
     }
 
-    // GET announcements for a specific mosque
+    @GetMapping("/feed")
+    public ResponseEntity<List<AnnouncementResponse>> getGlobalAnnouncementsFeed() {
+        List<Announcement> announcements = announcementRepository.findActiveGlobalAnnouncements(
+                LocalDateTime.now(), LocalDateTime.now()
+        );
+        List<AnnouncementResponse> dtos = announcements.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
     @GetMapping("/mosque/{mosqueId}")
-    public ResponseEntity<List<Announcement>> getAnnouncementsByMosque(@PathVariable Long mosqueId) {
+    public ResponseEntity<List<AnnouncementResponse>> getAnnouncementsByMosque(@PathVariable Long mosqueId) {
         Optional<Mosque> mosqueOptional = mosqueRepository.findById(mosqueId);
         if (mosqueOptional.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         List<Announcement> announcements = announcementRepository.findByMosqueOrderByPublishDateDesc(mosqueOptional.get());
-        return ResponseEntity.ok(announcements);
+        List<AnnouncementResponse> dtos = announcements.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
-    // GET a specific announcement by ID
     @GetMapping("/{id}")
     public ResponseEntity<Announcement> getAnnouncementById(@PathVariable Long id) {
         Optional<Announcement> announcement = announcementRepository.findById(id);
@@ -55,21 +78,30 @@ public class AnnouncementController {
 
     // POST: Create a new announcement
     @PostMapping
-    public ResponseEntity<Announcement> createAnnouncement(@RequestBody Announcement announcement) {
-        Optional<Mosque> mosqueOptional = mosqueRepository.findById(announcement.getMosque().getId());
+    public ResponseEntity<Announcement> createAnnouncement(@RequestBody AnnouncementRequest announcementRequest) { // <--- Changed input type
+        // Manually load the Mosque entity based on the ID from the request DTO
+        Optional<Mosque> mosqueOptional = mosqueRepository.findById(announcementRequest.getMosqueId());
         if (mosqueOptional.isEmpty()) {
-            return ResponseEntity.badRequest().build(); // Mosque not found
+            // Return a more informative error for the client
+            return ResponseEntity.badRequest().body(null); // Or new ResponseEntity<>("Mosque not found with provided ID", HttpStatus.BAD_REQUEST);
         }
+        Mosque mosque = mosqueOptional.get();
 
-        announcement.setMosque(mosqueOptional.get());
-        announcement.setPublishDate(LocalDateTime.now());
-        announcement.setPublished(true); // Default to true on creation
+        // Create the Announcement entity from the DTO and the loaded Mosque
+        Announcement announcement = new Announcement();
+        announcement.setTitle(announcementRequest.getTitle());
+        announcement.setContent(announcementRequest.getContent());
+        announcement.setMosque(mosque); // Set the fully managed Mosque entity
+        announcement.setPublishDate(LocalDateTime.now()); // Set publish date on backend
+        announcement.setExpirationDate(
+                announcementRequest.getExpirationDate() != null ? announcementRequest.getExpirationDate().atStartOfDay() : null
+        ); // Convert LocalDate from DTO to LocalDateTime for entity
+        announcement.setPublished(true);
 
         Announcement savedAnnouncement = announcementRepository.save(announcement);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedAnnouncement);
     }
 
-    // PUT: Update an existing announcement
     @PutMapping("/{id}")
     public ResponseEntity<Announcement> updateAnnouncement(@PathVariable Long id, @RequestBody Announcement announcementDetails) {
         Optional<Announcement> existingAnnouncementOptional = announcementRepository.findById(id);
@@ -82,13 +114,13 @@ public class AnnouncementController {
         existingAnnouncement.setContent(announcementDetails.getContent());
         existingAnnouncement.setExpirationDate(announcementDetails.getExpirationDate());
         existingAnnouncement.setPublished(announcementDetails.isPublished());
-        // Do not update Mosque or createdByUser from here to maintain data integrity or because they are not present
+        // If you want to allow changing the mosque, you'd need similar logic here
+        // to load the new mosque by ID and set it.
 
         Announcement updatedAnnouncement = announcementRepository.save(existingAnnouncement);
         return ResponseEntity.ok(updatedAnnouncement);
     }
 
-    // DELETE: Delete an announcement
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAnnouncement(@PathVariable Long id) {
         if (!announcementRepository.existsById(id)) {
